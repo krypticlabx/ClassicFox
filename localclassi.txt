@@ -1,0 +1,604 @@
+--// CLASSIFOX - MOVING BLUE ENERGY UI WITH ANTI GUARD LOGIC
+--// LocalScript
+
+local Players               = game:GetService("Players")
+local TweenService          = game:GetService("TweenService")
+local UIS                   = game:GetService("UserInputService")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+local RunService            = game:GetService("RunService")
+
+local Player = Players.LocalPlayer
+
+--==================================================
+-- ANTI GUARD LOGIC VARIABLES
+--==================================================
+
+local AntiGuardEnabled = false
+local IsAntiHitRunning = false
+local PROTECT_DURATION = 0.35
+
+local RoutePoints = {
+    CFrame.new(500.62, 241.28, -366.64),
+    CFrame.new(504.45, 155.80, -366.35),
+    CFrame.new(508.30,  70.28, -366.03),
+    CFrame.new(513.86,  70.28, -366.25),
+    CFrame.new(519.43,  70.28, -366.47),
+    CFrame.new(524.32,  70.28, -366.59),
+    CFrame.new(529.22,  70.28, -366.71),
+    CFrame.new(538.01,  70.28, -365.55),
+    CFrame.new(546.80,  70.28, -364.40),
+}
+local SAFE_CF = RoutePoints[#RoutePoints]
+
+local function getRoot()
+    local char = Player.Character
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function zeroVelocity(root)
+    pcall(function()
+        root.AssemblyLinearVelocity  = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+    end)
+end
+
+local function fireRoute()
+    local root = getRoot()
+    if not root then IsAntiHitRunning = false; return end
+
+    for _, cf in ipairs(RoutePoints) do
+        root.CFrame = cf
+    end
+    zeroVelocity(root)
+
+    local deadline = tick() + PROTECT_DURATION
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        -- Kung pinatay ang Anti Guard o lumipas na ang duration, i-disconnect na
+        if not AntiGuardEnabled or tick() > deadline then
+            conn:Disconnect()
+            IsAntiHitRunning = false
+            return
+        end
+        local r = getRoot()
+        if not r then conn:Disconnect(); IsAntiHitRunning = false; return end
+        r.CFrame = SAFE_CF
+        zeroVelocity(r)
+    end)
+end
+
+ProximityPromptService.PromptTriggered:Connect(function(_, player)
+    if player ~= Player            then return end
+    if not AntiGuardEnabled        then return end -- Gagana lang kapag naka-On ang Anti Guard
+    if IsAntiHitRunning            then return end
+    IsAntiHitRunning = true
+    task.spawn(fireRoute)
+end)
+
+--==================================================
+-- GUI
+--==================================================
+
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "ClassiFox"
+Gui.ResetOnSpawn = false
+Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+Gui.Parent = Player:WaitForChild("PlayerGui")
+
+--==================================================
+-- MAIN
+--==================================================
+
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Size = UDim2.fromOffset(280,155)
+Main.Position = UDim2.new(0.5,-140,0.5,-77)
+Main.BackgroundColor3 = Color3.fromRGB(3,5,10)
+Main.BorderSizePixel = 0
+Main.Parent = Gui
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0,13)
+Corner.Parent = Main
+
+--==================================================
+-- MAIN BORDER
+--==================================================
+
+local Stroke = Instance.new("UIStroke")
+Stroke.Name = "MovingBlueBorder"
+Stroke.Color = Color3.fromRGB(0,140,255)
+Stroke.Thickness = 2
+Stroke.Parent = Main
+
+-- Moving gradient on border
+local BorderGradient = Instance.new("UIGradient")
+BorderGradient.Name = "MovingEnergy"
+BorderGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(0,45,120)),
+	ColorSequenceKeypoint.new(0.25, Color3.fromRGB(0,100,220)),
+	ColorSequenceKeypoint.new(0.45, Color3.fromRGB(0,220,255)),
+	ColorSequenceKeypoint.new(0.55, Color3.fromRGB(120,240,255)),
+	ColorSequenceKeypoint.new(0.70, Color3.fromRGB(0,140,255)),
+	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0,45,120))
+})
+BorderGradient.Rotation = 0
+BorderGradient.Parent = Stroke
+
+-- Outer glow
+local OuterGlow = Instance.new("UIStroke")
+OuterGlow.Name = "OuterGlow"
+OuterGlow.Color = Color3.fromRGB(0,120,255)
+OuterGlow.Thickness = 7
+OuterGlow.Transparency = 0.70
+OuterGlow.Parent = Main
+
+local OuterGradient = Instance.new("UIGradient")
+OuterGradient.Name = "OuterMovingEnergy"
+OuterGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(0,40,100)),
+	ColorSequenceKeypoint.new(0.45, Color3.fromRGB(0,150,255)),
+	ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0,230,255)),
+	ColorSequenceKeypoint.new(0.55, Color3.fromRGB(0,150,255)),
+	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0,40,100))
+})
+OuterGradient.Parent = OuterGlow
+
+--==================================================
+-- MOVING BORDER ANIMATION
+--==================================================
+
+task.spawn(function()
+	while Gui.Parent do
+		BorderGradient.Rotation = 0
+		OuterGradient.Rotation = 0
+
+		local BorderTween = TweenService:Create(
+			BorderGradient,
+			TweenInfo.new(2.4, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut),
+			{Rotation = 360}
+		)
+
+		local OuterTween = TweenService:Create(
+			OuterGradient,
+			TweenInfo.new(2.4, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut),
+			{Rotation = 360}
+		)
+
+		BorderTween:Play()
+		OuterTween:Play()
+
+		task.wait(2.4)
+	end
+end)
+
+--==================================================
+-- HEADER
+--==================================================
+
+local Header = Instance.new("Frame")
+Header.Name = "Header"
+Header.Size = UDim2.new(1,-14,0,48)
+Header.Position = UDim2.fromOffset(7,6)
+Header.BackgroundTransparency = 1
+Header.Parent = Main
+
+--==================================================
+-- LOGO
+--==================================================
+
+local Logo = Instance.new("Frame")
+Logo.Name = "Logo"
+Logo.Size = UDim2.fromOffset(39,39)
+Logo.Position = UDim2.fromOffset(2,3)
+Logo.BackgroundColor3 = Color3.fromRGB(4,8,16)
+Logo.BorderSizePixel = 0
+Logo.Parent = Header
+
+local LogoCorner = Instance.new("UICorner")
+LogoCorner.CornerRadius = UDim.new(0,10)
+LogoCorner.Parent = Logo
+
+local LogoStroke = Instance.new("UIStroke")
+LogoStroke.Name = "LogoMovingBorder"
+LogoStroke.Color = Color3.fromRGB(0,140,255)
+LogoStroke.Thickness = 2
+LogoStroke.Parent = Logo
+
+local LogoGradient = Instance.new("UIGradient")
+LogoGradient.Name = "LogoEnergy"
+LogoGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(0,50,130)),
+	ColorSequenceKeypoint.new(0.40, Color3.fromRGB(0,150,255)),
+	ColorSequenceKeypoint.new(0.50, Color3.fromRGB(120,245,255)),
+	ColorSequenceKeypoint.new(0.60, Color3.fromRGB(0,150,255)),
+	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0,50,130))
+})
+LogoGradient.Parent = LogoStroke
+
+--==================================================
+-- LOGO ANIMATION
+--==================================================
+
+task.spawn(function()
+	while Gui.Parent do
+		LogoGradient.Rotation = 0
+
+		TweenService:Create(
+			LogoGradient,
+			TweenInfo.new(1.6, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut),
+			{Rotation = 360}
+		):Play()
+
+		task.wait(1.6)
+	end
+end)
+
+--==================================================
+-- LOGO IMAGE ICON
+--==================================================
+
+local Icon = Instance.new("ImageLabel")
+Icon.Name = "Icon"
+Icon.Size = UDim2.new(1, -6, 1, -6)
+Icon.Position = UDim2.fromOffset(3, 3)
+Icon.BackgroundTransparency = 1
+Icon.Image = "rbxassetid://129545900336610"
+Icon.Parent = Logo
+
+--==================================================
+-- CLASSIFOX TITLE
+--==================================================
+
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Size = UDim2.fromOffset(190,30)
+Title.Position = UDim2.fromOffset(50,8)
+Title.BackgroundTransparency = 1
+Title.Text = '<font color="#0096FF">Classi</font><font color="#FF8A00">Fox</font>'
+Title.RichText = true
+Title.TextSize = 17
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.TextYAlignment = Enum.TextYAlignment.Center
+Title.Parent = Header
+
+--==================================================
+-- CLOSE
+--==================================================
+
+local Close = Instance.new("TextButton")
+Close.Name = "Close"
+Close.Size = UDim2.fromOffset(35,35)
+Close.Position = UDim2.new(1,-40,0,5)
+Close.BackgroundColor3 = Color3.fromRGB(3,6,12)
+Close.BorderSizePixel = 0
+Close.Text = "X"
+Close.TextColor3 = Color3.fromRGB(235,245,255)
+Close.TextSize = 15
+Close.Font = Enum.Font.GothamBold
+Close.AutoButtonColor = false
+Close.Parent = Header
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0,9)
+CloseCorner.Parent = Close
+
+local CloseStroke = Instance.new("UIStroke")
+CloseStroke.Color = Color3.fromRGB(0,120,235)
+CloseStroke.Thickness = 1.5
+CloseStroke.Parent = Close
+
+local CloseGradient = Instance.new("UIGradient")
+CloseGradient.Name = "CloseEnergy"
+CloseGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0,Color3.fromRGB(0,50,120)),
+	ColorSequenceKeypoint.new(0.5,Color3.fromRGB(0,210,255)),
+	ColorSequenceKeypoint.new(1,Color3.fromRGB(0,50,120))
+})
+CloseGradient.Parent = CloseStroke
+
+task.spawn(function()
+	while Gui.Parent do
+		CloseGradient.Rotation = 0
+
+		TweenService:Create(
+			CloseGradient,
+			TweenInfo.new(1.5, Enum.EasingStyle.Linear),
+			{Rotation = 360}
+		):Play()
+
+		task.wait(1.5)
+	end
+end)
+
+Close.MouseButton1Click:Connect(function()
+	Gui.Enabled = false
+end)
+
+--==================================================
+-- DIVIDER
+--==================================================
+
+local Divider = Instance.new("Frame")
+Divider.Name = "Divider"
+Divider.Size = UDim2.new(1,-14,0,2)
+Divider.Position = UDim2.fromOffset(7,55)
+Divider.BackgroundColor3 = Color3.fromRGB(0,125,240)
+Divider.BorderSizePixel = 0
+Divider.Parent = Main
+
+local DividerGradient = Instance.new("UIGradient")
+DividerGradient.Name = "MovingDivider"
+DividerGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0.00,Color3.fromRGB(0,50,130)),
+	ColorSequenceKeypoint.new(0.35,Color3.fromRGB(0,130,255)),
+	ColorSequenceKeypoint.new(0.50,Color3.fromRGB(120,245,255)),
+	ColorSequenceKeypoint.new(0.65,Color3.fromRGB(0,130,255)),
+	ColorSequenceKeypoint.new(1.00,Color3.fromRGB(0,50,130))
+})
+DividerGradient.Parent = Divider
+
+task.spawn(function()
+	while Gui.Parent do
+		DividerGradient.Offset = Vector2.new(-1,0)
+
+		TweenService:Create(
+			DividerGradient,
+			TweenInfo.new(1.8, Enum.EasingStyle.Linear),
+			{Offset = Vector2.new(1,0)}
+		):Play()
+
+		task.wait(1.8)
+	end
+end)
+
+--==================================================
+-- ANTI GUARD
+--==================================================
+
+local AntiGuard = Instance.new("Frame")
+AntiGuard.Name = "AntiGuard"
+AntiGuard.Size = UDim2.new(1,-14,0,80)
+AntiGuard.Position = UDim2.fromOffset(7,64)
+AntiGuard.BackgroundColor3 = Color3.fromRGB(2,4,9)
+AntiGuard.BorderSizePixel = 0
+AntiGuard.Parent = Main
+
+local AntiGuardCorner = Instance.new("UICorner")
+AntiGuardCorner.CornerRadius = UDim.new(0,11)
+AntiGuardCorner.Parent = AntiGuard
+
+--==================================================
+-- ANTI GUARD BORDER
+--==================================================
+
+local AntiGuardStroke = Instance.new("UIStroke")
+AntiGuardStroke.Name = "AntiGuardMovingBorder"
+AntiGuardStroke.Color = Color3.fromRGB(0,120,235)
+AntiGuardStroke.Thickness = 2
+AntiGuardStroke.Parent = AntiGuard
+
+local AntiGuardGradient = Instance.new("UIGradient")
+AntiGuardGradient.Name = "AntiGuardEnergy"
+AntiGuardGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0.00,Color3.fromRGB(0,40,110)),
+	ColorSequenceKeypoint.new(0.25,Color3.fromRGB(0,100,220)),
+	ColorSequenceKeypoint.new(0.45,Color3.fromRGB(0,220,255)),
+	ColorSequenceKeypoint.new(0.55,Color3.fromRGB(130,245,255)),
+	ColorSequenceKeypoint.new(0.75,Color3.fromRGB(0,120,240)),
+	ColorSequenceKeypoint.new(1.00,Color3.fromRGB(0,40,110))
+})
+AntiGuardGradient.Parent = AntiGuardStroke
+
+--==================================================
+-- ANTI GUARD OUTER GLOW
+--==================================================
+
+local AntiGuardGlow = Instance.new("UIStroke")
+AntiGuardGlow.Name = "AntiGuardOuterGlow"
+AntiGuardGlow.Color = Color3.fromRGB(0,110,255)
+AntiGuardGlow.Thickness = 6
+AntiGuardGlow.Transparency = 0.72
+AntiGuardGlow.Parent = AntiGuard
+
+local AntiGuardGlowGradient = Instance.new("UIGradient")
+AntiGuardGlowGradient.Name = "GlowEnergy"
+AntiGuardGlowGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0,Color3.fromRGB(0,40,100)),
+	ColorSequenceKeypoint.new(0.45,Color3.fromRGB(0,150,255)),
+	ColorSequenceKeypoint.new(0.50,Color3.fromRGB(0,230,255)),
+	ColorSequenceKeypoint.new(0.55,Color3.fromRGB(0,150,255)),
+	ColorSequenceKeypoint.new(1,Color3.fromRGB(0,40,100))
+})
+AntiGuardGlowGradient.Parent = AntiGuardGlow
+
+--==================================================
+-- ANTI GUARD MOVING EFFECT
+--==================================================
+
+task.spawn(function()
+	while Gui.Parent do
+		AntiGuardGradient.Rotation = 0
+		AntiGuardGlowGradient.Rotation = 0
+
+		TweenService:Create(
+			AntiGuardGradient,
+			TweenInfo.new(2, Enum.EasingStyle.Linear),
+			{Rotation = 360}
+		):Play()
+
+		TweenService:Create(
+			AntiGuardGlowGradient,
+			TweenInfo.new(2, Enum.EasingStyle.Linear),
+			{Rotation = 360}
+		):Play()
+
+		task.wait(2)
+	end
+end)
+
+--==================================================
+-- ANTI GUARD TEXT
+--==================================================
+
+local GuardText = Instance.new("TextLabel")
+GuardText.Name = "GuardText"
+GuardText.Size = UDim2.new(1,-90,1,0)
+GuardText.Position = UDim2.fromOffset(14,0)
+GuardText.BackgroundTransparency = 1
+GuardText.Text = "ANTI GUARD"
+GuardText.TextColor3 = Color3.fromRGB(240,242,248)
+GuardText.TextSize = 15
+GuardText.Font = Enum.Font.GothamBold
+GuardText.TextXAlignment = Enum.TextXAlignment.Left
+GuardText.TextYAlignment = Enum.TextYAlignment.Center
+GuardText.Parent = AntiGuard
+
+--==================================================
+-- TOGGLE
+--==================================================
+
+local Toggle = Instance.new("TextButton")
+Toggle.Name = "AntiGuardToggle"
+Toggle.Size = UDim2.fromOffset(51,28)
+Toggle.Position = UDim2.new(1,-65,0.5,-14)
+Toggle.BackgroundColor3 = Color3.fromRGB(25,30,42)
+Toggle.BorderSizePixel = 0
+Toggle.Text = ""
+Toggle.AutoButtonColor = false
+Toggle.Parent = AntiGuard
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(1,0)
+ToggleCorner.Parent = Toggle
+
+local ToggleStroke = Instance.new("UIStroke")
+ToggleStroke.Color = Color3.fromRGB(40,50,70)
+ToggleStroke.Thickness = 1
+ToggleStroke.Parent = Toggle
+
+local Knob = Instance.new("Frame")
+Knob.Name = "Knob"
+Knob.Size = UDim2.fromOffset(21,21)
+Knob.Position = UDim2.fromOffset(4,3.5)
+Knob.BackgroundColor3 = Color3.fromRGB(225,230,240)
+Knob.BorderSizePixel = 0
+Knob.Parent = Toggle
+
+local KnobCorner = Instance.new("UICorner")
+KnobCorner.CornerRadius = UDim.new(1,0)
+KnobCorner.Parent = Knob
+
+--==================================================
+-- ANTI GUARD STATE FUNCTION
+--==================================================
+
+local function SetAntiGuard(State)
+	AntiGuardEnabled = State
+
+	if State then
+		TweenService:Create(
+			Toggle,
+			TweenInfo.new(0.16, Enum.EasingStyle.Quad),
+			{BackgroundColor3 = Color3.fromRGB(0,145,255)}
+		):Play()
+
+		TweenService:Create(
+			ToggleStroke,
+			TweenInfo.new(0.16),
+			{Color = Color3.fromRGB(0,200,255), Thickness = 1.5}
+		):Play()
+
+		TweenService:Create(
+			Knob,
+			TweenInfo.new(0.16, Enum.EasingStyle.Quad),
+			{Position = UDim2.new(1,-25,0,3.5)}
+		):Play()
+	else
+		TweenService:Create(
+			Toggle,
+			TweenInfo.new(0.16, Enum.EasingStyle.Quad),
+			{BackgroundColor3 = Color3.fromRGB(25,30,42)}
+		):Play()
+
+		TweenService:Create(
+			ToggleStroke,
+			TweenInfo.new(0.16),
+			{Color = Color3.fromRGB(40,50,70), Thickness = 1}
+		):Play()
+
+		TweenService:Create(
+			Knob,
+			TweenInfo.new(0.16, Enum.EasingStyle.Quad),
+			{Position = UDim2.fromOffset(4,3.5)}
+		):Play()
+	end
+
+	print("Anti Guard:", AntiGuardEnabled)
+end
+
+Toggle.MouseButton1Click:Connect(function()
+	SetAntiGuard(not AntiGuardEnabled)
+end)
+
+--==================================================
+-- DRAGGING
+--==================================================
+
+local Dragging = false
+local DragStart
+local StartPos
+
+Header.InputBegan:Connect(function(Input)
+	if Input.UserInputType == Enum.UserInputType.MouseButton1
+		or Input.UserInputType == Enum.UserInputType.Touch then
+
+		Dragging = true
+		DragStart = Input.Position
+		StartPos = Main.Position
+
+		Input.Changed:Connect(function()
+			if Input.UserInputState == Enum.UserInputState.End then
+				Dragging = false
+			end
+		end)
+	end
+end)
+
+UIS.InputChanged:Connect(function(Input)
+	if not Dragging then return end
+
+	if Input.UserInputType == Enum.UserInputType.MouseMovement
+		or Input.UserInputType == Enum.UserInputType.Touch then
+
+		local Delta = Input.Position - DragStart
+
+		Main.Position = UDim2.new(
+			StartPos.X.Scale,
+			StartPos.X.Offset + Delta.X,
+			StartPos.Y.Scale,
+			StartPos.Y.Offset + Delta.Y
+		)
+	end
+end)
+
+--==================================================
+-- MOBILE SCALE
+--==================================================
+
+local Camera = workspace.CurrentCamera
+
+local Scale = Instance.new("UIScale")
+Scale.Name = "MobileScale"
+Scale.Parent = Main
+
+local function UpdateScale()
+	if not Camera then return end
+	local Viewport = Camera.ViewportSize
+	local S = math.min(Viewport.X / 400, Viewport.Y / 250)
+	Scale.Scale = math.clamp(S, 0.70, 1)
+end
+
+UpdateScale()
+Camera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateScale)
